@@ -1,0 +1,207 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Segoe UI", sans-serif;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background: #1a1a2e;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+header h1 {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+#node-info {
+    font-size: 12px;
+    color: #888;
+}
+
+/* ---------- Tabs ---------- */
+nav#tabs {
+    display: flex;
+    background: #16162a;
+    border-bottom: 1px solid #2a2a4a;
+}
+
+nav#tabs button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    position: relative;
+}
+
+nav#tabs button:hover {
+    background: #1e1e3a;
+}
+
+nav#tabs button.active {
+    color: #fff;
+    background: #2a2a5a;
+    border-bottom: 2px solid #6c5ce7;
+}
+
+.badge {
+    position: absolute;
+    top: 6px;
+    right: 12px;
+    background: #e94560;
+    color: #fff;
+    font-size: 10px;
+    min-width: 18px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    display: none;
+}
+
+.badge.visible {
+    display: inline;
+}
+
+/* ---------- Chat ---------- */
+main#chat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#messages:empty::after {
+    content: "Nenhuma mensagem ainda. Comece a conversa!";
+    color: #555;
+    text-align: center;
+    margin-top: 40%;
+    font-size: 14px;
+}
+
+/* ---------- Mensagens ---------- */
+.msg {
+    max-width: 75%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    word-wrap: break-word;
+}
+
+.msg.mine {
+    background: #6c5ce7;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.msg.theirs {
+    background: #1a1a2e;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    border: 1px solid #2a2a4a;
+}
+
+.msg .meta {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 4px;
+}
+
+.msg .fwd-info {
+    font-size: 11px;
+    color: #e94560;
+    font-style: italic;
+    margin-bottom: 4px;
+    padding: 4px 8px;
+    background: rgba(233, 69, 96, 0.1);
+    border-radius: 4px;
+}
+
+.msg .content {
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.msg .actions {
+    margin-top: 6px;
+}
+
+.msg .actions button {
+    font-size: 11px;
+    background: rgba(108, 92, 231, 0.3);
+    color: #b8b0ff;
+    border: 1px solid rgba(108, 92, 231, 0.5);
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.msg .actions button:hover {
+    background: rgba(108, 92, 231, 0.6);
+    color: #fff;
+}
+
+/* ---------- Input ---------- */
+#input-area {
+    display: flex;
+    padding: 12px 16px;
+    background: #1a1a2e;
+    gap: 8px;
+    border-top: 1px solid #2a2a4a;
+}
+
+#input-area input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+#input-area input:focus {
+    border-color: #6c5ce7;
+}
+
+#input-area button {
+    padding: 12px 24px;
+    background: #6c5ce7;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+#input-area button:hover {
+    background: #5a4bd1;
+}
