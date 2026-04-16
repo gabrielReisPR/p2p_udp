@@ -13,16 +13,17 @@ from typing import Optional
 
 load_dotenv()
 
-# --------------- Configuracao via variaveis de ambiente ---------------
-NODE_NAME = os.environ.get("NODE_NAME", "No_A")
-UDP_PORT = int(os.environ.get("UDP_PORT", "5000"))
-HTTP_PORT = int(os.environ.get("HTTP_PORT", "8000"))
+# --------------- Configuracao via .env ---------------
+# .strip() remove espacos/\r que podem vir de .env criado no Windows
+NODE_NAME = os.environ.get("NODE_NAME", "No_A").strip()
+UDP_PORT = int(os.environ.get("UDP_PORT", "5000").strip())
+HTTP_PORT = int(os.environ.get("HTTP_PORT", "80").strip())
 
 NEIGHBORS: dict[str, dict] = {}
 for _i in [1, 2]:
-    _name = os.environ.get(f"NEIGHBOR_{_i}_NAME")
-    _ip = os.environ.get(f"NEIGHBOR_{_i}_IP")
-    _port = os.environ.get(f"NEIGHBOR_{_i}_PORT")
+    _name = os.environ.get(f"NEIGHBOR_{_i}_NAME", "").strip()
+    _ip = os.environ.get(f"NEIGHBOR_{_i}_IP", "").strip()
+    _port = os.environ.get(f"NEIGHBOR_{_i}_PORT", "").strip()
     if _name and _ip and _port:
         NEIGHBORS[_name] = {"name": _name, "ip": _ip, "port": int(_port)}
 
@@ -37,7 +38,7 @@ udp_sock.bind(("0.0.0.0", UDP_PORT))
 
 
 def get_local_ip() -> str:
-    """Descobre o IP local da interface de saida."""
+    """Descobre o IP privado da maquina."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(("8.8.8.8", 80))
@@ -59,15 +60,22 @@ def udp_listener():
         data, addr = udp_sock.recvfrom(65535)
         try:
             msg = json.loads(data.decode("utf-8"))
-            # A conversa eh identificada pelo remetente do pacote
             conv_name = msg["sender_name"]
+            print(
+                f"[RECEBIDO] {msg['sender_name']} -> {msg['dest_name']} "
+                f"| IP origem: {addr[0]}:{addr[1]} "
+                f"| forwarded: {msg.get('forwarded')}",
+                flush=True,
+            )
             with lock:
                 if conv_name in conversations:
                     msg_counter += 1
                     msg["id"] = msg_counter
                     conversations[conv_name].append(msg)
+                else:
+                    print(f"[AVISO] Remetente '{conv_name}' nao eh vizinho conhecido", flush=True)
         except Exception as e:
-            print(f"[UDP] Erro ao processar pacote: {e}")
+            print(f"[ERRO UDP] {e}", flush=True)
 
 
 threading.Thread(target=udp_listener, daemon=True).start()
@@ -121,7 +129,6 @@ def send_message(req: SendRequest):
 
     neighbor = NEIGHBORS[req.dest_name]
 
-    # Estrutura da mensagem conforme especificacao
     msg = {
         "timestamp": datetime.now().isoformat(),
         "sender_name": NODE_NAME,
@@ -136,13 +143,20 @@ def send_message(req: SendRequest):
         "original_sender_name": None,
     }
 
-    # Envia via socket UDP (SOCK_DGRAM)
-    udp_sock.sendto(
-        json.dumps(msg).encode("utf-8"),
-        (neighbor["ip"], neighbor["port"]),
-    )
+    try:
+        udp_sock.sendto(
+            json.dumps(msg).encode("utf-8"),
+            (neighbor["ip"], neighbor["port"]),
+        )
+        print(
+            f"[ENVIADO] {NODE_NAME} -> {req.dest_name} "
+            f"({neighbor['ip']}:{neighbor['port']})",
+            flush=True,
+        )
+    except Exception as e:
+        print(f"[ERRO ENVIO] {e}", flush=True)
+        return {"error": str(e)}
 
-    # Armazena localmente na conversa
     with lock:
         msg_counter += 1
         msg["id"] = msg_counter
@@ -157,7 +171,6 @@ def forward_message(req: ForwardRequest):
     """Encaminha uma mensagem recebida para outro vizinho."""
     global msg_counter
 
-    # Busca a mensagem original
     with lock:
         original = None
         for conv_msgs in conversations.values():
@@ -174,8 +187,6 @@ def forward_message(req: ForwardRequest):
         return {"error": "Vizinho desconhecido"}
 
     neighbor = NEIGHBORS[req.dest_name]
-
-    # Preserva o remetente original (encadeamento de encaminhamentos)
     original_sender = original.get("original_sender_name") or original["sender_name"]
 
     msg = {
@@ -192,10 +203,20 @@ def forward_message(req: ForwardRequest):
         "original_sender_name": original_sender,
     }
 
-    udp_sock.sendto(
-        json.dumps(msg).encode("utf-8"),
-        (neighbor["ip"], neighbor["port"]),
-    )
+    try:
+        udp_sock.sendto(
+            json.dumps(msg).encode("utf-8"),
+            (neighbor["ip"], neighbor["port"]),
+        )
+        print(
+            f"[ENCAMINHADO] {NODE_NAME} -> {req.dest_name} "
+            f"({neighbor['ip']}:{neighbor['port']}) "
+            f"| msg original de {original_sender}",
+            flush=True,
+        )
+    except Exception as e:
+        print(f"[ERRO ENCAMINHAMENTO] {e}", flush=True)
+        return {"error": str(e)}
 
     with lock:
         msg_counter += 1
@@ -204,6 +225,38 @@ def forward_message(req: ForwardRequest):
         conversations[req.dest_name].append(msg)
 
     return {"ok": True}
+
+
+# --------------- Teste de conectividade UDP ---------------
+@app.get("/api/test-udp/{neighbor_name}")
+def test_udp(neighbor_name: str):
+    """Envia um ping UDP para um vizinho e loga no terminal."""
+    if neighbor_name not in NEIGHBORS:
+        return {"error": "Vizinho desconhecido"}
+    neighbor = NEIGHBORS[neighbor_name]
+    test_msg = {
+        "timestamp": datetime.now().isoformat(),
+        "sender_name": NODE_NAME,
+        "sender_ip": LOCAL_IP,
+        "sender_port": UDP_PORT,
+        "dest_name": neighbor_name,
+        "dest_ip": neighbor["ip"],
+        "dest_port": neighbor["port"],
+        "content": f"[TESTE] Ping de {NODE_NAME}",
+        "forwarded": False,
+        "forwarded_by_name": None,
+        "original_sender_name": None,
+    }
+    try:
+        udp_sock.sendto(
+            json.dumps(test_msg).encode("utf-8"),
+            (neighbor["ip"], neighbor["port"]),
+        )
+        print(f"[TESTE] Ping enviado para {neighbor_name} ({neighbor['ip']}:{neighbor['port']})", flush=True)
+        return {"ok": True, "sent_to": f"{neighbor['ip']}:{neighbor['port']}"}
+    except Exception as e:
+        print(f"[TESTE ERRO] {e}", flush=True)
+        return {"error": str(e)}
 
 
 # --------------- Servir frontend ---------------
@@ -218,7 +271,9 @@ def index():
 # --------------- Inicializacao ---------------
 if __name__ == "__main__":
     print(f"[*] No: {NODE_NAME}")
+    print(f"[*] IP local: {LOCAL_IP}")
     print(f"[*] UDP escutando em 0.0.0.0:{UDP_PORT}")
     print(f"[*] HTTP em http://0.0.0.0:{HTTP_PORT}")
-    print(f"[*] Vizinhos: {list(NEIGHBORS.keys())}")
+    for name, info in NEIGHBORS.items():
+        print(f"[*] Vizinho: {name} -> {info['ip']}:{info['port']}")
     uvicorn.run(app, host="0.0.0.0", port=HTTP_PORT)
